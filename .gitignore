@@ -1,0 +1,80 @@
+# =====================================================================
+# Byte-compiled / optimized / DLL files
+# =====================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# =====================================================================
+# Testing and Coverage
+# =====================================================================
+.pytest_cache/
+.coverage
+htmlcov/
+
+# =====================================================================
+# Virtual Environments
+# =====================================================================
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# =====================================================================
+# Environment Variables, Secrets, & Credentials
+# =====================================================================
+.env
+.env.*
+*.env
+*.pem
+*.key
+
+# =====================================================================
+# IDEs and Editors
+# =====================================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# =====================================================================
+# Model Checkpoints
+# Excluded from Git due to GitHub 100 MB single-file size limit (678 MB total).
+# Production deployment will fetch via S3/Cloud Storage/Git LFS asset release.
+# =====================================================================
+checkpoints/**/*.pth
+*.pth
+*.pt
+*.onnx
+*.bin
+*.h5
+
+# Keep checkpoint folder structure
+!checkpoints/**/.gitkeep
+
+# =====================================================================
+# Runtime Storage & Local SQLite Database
+# Exclude uploaded clinical photos, generated reports, and local DB instances
+# =====================================================================
+storage/database/*.db
+storage/database/*.db-journal
+storage/database/*.sqlite3
+storage/reports/*
+!storage/reports/.gitkeep
+storage/uploads/*
+!storage/uploads/.gitkeep
+!storage/database/.gitkeep
+
+# =====================================================================
+# Operating System & Temporary Files
+# =====================================================================
+.DS_Store
+Thumbs.db
+*.tmp
+*.temp
+*.log
