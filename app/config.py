@@ -3,6 +3,8 @@ import sys
 from pathlib import Path
 import torch
 
+from typing import Optional
+
 # Base Directory of WoundInsight-API project
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -16,6 +18,20 @@ class Settings:
     VERSION: str = "1.0.0"
     DOCS_URL: str = "/docs"
     REDOC_URL: str = "/redoc"
+
+    # Hugging Face Model Hub Configuration
+    HF_MODEL_REPO_ID: str = os.getenv("HF_MODEL_REPO_ID", "SnehanshKhanna/WoundInsight-models")
+    HF_TOKEN: Optional[str] = os.getenv("HF_TOKEN", os.getenv("HUGGINGFACE_HUB_TOKEN", None))
+    HF_REVISION: Optional[str] = os.getenv("HF_REVISION", None)
+    HF_FORCE_DOWNLOAD: bool = os.getenv("HF_FORCE_DOWNLOAD", "false").lower() in ("true", "1", "yes")
+
+    # Local Checkpoint Directory
+    CHECKPOINTS_DIR: Path = BASE_DIR / "checkpoints"
+
+    # Relative Remote File Paths on Hugging Face Repository
+    WOUND_MODEL_REMOTE_PATH: str = "segmentation/retrained_best_wound_model.pth"
+    TISSUE_MODEL_REMOTE_PATH: str = "tissue_segmentation/retrained_best_tissue_model.pth"
+    CLASSIFIER_MODEL_REMOTE_PATH: str = "classification/retrained_best_dual_branch_classifier.pth"
 
     # Production Model Checkpoint Paths
     WOUND_MODEL_PATH: str = os.getenv(
@@ -68,10 +84,14 @@ class Settings:
     CORS_ORIGINS: list[str] = ["*"]
 
     def ensure_storage_dirs(self) -> None:
-        """Ensures all persistence directories exist on disk."""
+        """Ensures all persistence and checkpoint directories exist on disk."""
         self.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
         self.REPORT_DIR.mkdir(parents=True, exist_ok=True)
         self.DATABASE_DIR.mkdir(parents=True, exist_ok=True)
+        self.CHECKPOINTS_DIR.mkdir(parents=True, exist_ok=True)
+        (self.CHECKPOINTS_DIR / "classification").mkdir(parents=True, exist_ok=True)
+        (self.CHECKPOINTS_DIR / "segmentation").mkdir(parents=True, exist_ok=True)
+        (self.CHECKPOINTS_DIR / "tissue_segmentation").mkdir(parents=True, exist_ok=True)
 
 settings = Settings()
 settings.ensure_storage_dirs()

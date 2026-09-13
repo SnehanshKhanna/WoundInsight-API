@@ -24,6 +24,14 @@ from tests.test_analysis import (
 )
 from tests.test_persistence import test_persistence_and_retrieval
 from tests.test_isolation import test_no_woundinsight_imports, test_checkpoint_isolation
+from tests.test_hf_models import (
+    test_hf_configuration,
+    test_hf_remote_resolution,
+    test_hf_caching_behavior,
+    test_hf_download_isolated_target,
+    test_numerical_equivalence_on_1014,
+    test_cpu_inference_compatibility
+)
 
 def run_suite():
     print("=" * 80)
@@ -54,6 +62,15 @@ def run_suite():
     test_no_woundinsight_imports()
     test_checkpoint_isolation()
     print("  [PASS] Complete repository isolation verified (0 external runtime dependencies)")
+
+    print("\n--- [SUITE 5: HUGGING FACE HUB INTEGRATION & CACHING] ---")
+    test_hf_configuration()
+    test_hf_remote_resolution()
+    test_hf_caching_behavior()
+    test_hf_download_isolated_target()
+    test_numerical_equivalence_on_1014()
+    test_cpu_inference_compatibility()
+    print("  [PASS] Hugging Face Hub integration & CPU compatibility verified")
 
     total_time = time.perf_counter() - start_total
     print("\n" + "=" * 80)

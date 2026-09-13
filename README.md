@@ -85,22 +85,109 @@ WoundInsight-API/
 
 ---
 
-## Model Checkpoints
+## Model Checkpoints & Hugging Face Hub
 
 The API requires three production deep learning model weights totaling approximately 678 MB:
 - `checkpoints/segmentation/retrained_best_wound_model.pth` (~257.08 MB)
 - `checkpoints/tissue_segmentation/retrained_best_tissue_model.pth` (~257.09 MB)
 - `checkpoints/classification/retrained_best_dual_branch_classifier.pth` (~163.69 MB)
 
-> **Important (Git & Model Storage)**:
-> Each of these checkpoint files exceeds GitHub's 100 MB individual file limit. Consequently, the binary checkpoint files (`*.pth`) are excluded from this Git repository via `.gitignore` to maintain a clean and standard repository structure.
-> 
-> - **Local Development**: Ensure the three `.pth` files are present in their designated directories under `checkpoints/` before running the API or automated tests.
-> - **Production Deployment**: For production containerization or cloud deployments, models will be fetched or mounted via an external model-storage solution (e.g., AWS S3, Google Cloud Storage, Hugging Face Hub, or automated asset download script).
+Production models are hosted publicly on Hugging Face:
+👉 **[SnehanshKhanna/WoundInsight-models](https://huggingface.co/SnehanshKhanna/WoundInsight-models)**
+
+The built-in `ModelManager` (`app/services/model_manager.py`) automatically ensures all checkpoints are present at startup using the official `huggingface_hub` Python client:
+- **Local Cache**: Existing models in `checkpoints/` are reused instantly with zero network delay.
+- **Cold Start / Container**: In clean environments or Docker containers, missing models are downloaded on application startup and cached locally for the lifetime of the container instance.
+- **Zero Per-Request Overhead**: Once loaded in memory, inference requests execute with zero download overhead.
 
 ---
 
-## Quickstart
+## Google Cloud Run Deployment
+
+WoundInsight-API is packaged and configured for deployment as a containerized microservice on **Google Cloud Run** with automated CPU fallback.
+
+### 1. Architecture Highlights
+- **Container Base**: `python:3.11-slim` with CPU-optimized PyTorch wheels (`--index-url https://download.pytorch.org/whl/cpu`), minimizing the container image footprint to ~1.2 GiB (compared to ~5 GiB for CUDA images).
+- **Dynamic Port Binding**: Automatically respects Cloud Run's `$PORT` environment variable (defaults to `8080`).
+- **Dynamic Model Fetching**: Model checkpoints are excluded from the Docker build context via `.dockerignore` and automatically fetched at instance startup from Hugging Face Hub.
+- **Compute Fallback**: Operates on CPU in Cloud Run while automatically supporting local GPU (`cuda:0`) development.
+- **Ephemeral Storage Notice**: Cloud Run container filesystems are ephemeral. The built-in SQLite database and generated visual diagnostic reports are persisted across requests *within the lifetime of the specific container instance*, but are discarded on instance recycling. External managed storage (e.g., Cloud SQL, Cloud Storage) can be integrated for long-term multi-instance persistence.
+
+### 2. Sizing & Resource Requirements
+- **Memory**: Provision **at least 2 GiB to 4 GiB** (recommended: `4Gi`) to comfortably accommodate the three deep learning models in memory (~1.5 GiB working set) alongside concurrent image processing.
+- **vCPU**: 1 to 2 vCPUs (recommended: `2`).
+- **Timeout**: Set to at least `120s` (to allow model downloading on cold starts).
+
+### 3. Environment Variables
+
+| Variable | Default | Purpose |
+| :--- | :--- | :--- |
+| `PORT` | `8080` | Port listened to by Uvicorn (assigned by Cloud Run) |
+| `API_DEVICE` | `cpu` | Force CPU execution on Cloud Run (`cuda:0` auto-detected locally) |
+| `HF_MODEL_REPO_ID` | `SnehanshKhanna/WoundInsight-models` | Hugging Face Hub repository containing model checkpoints |
+| `HF_TOKEN` | *(Optional)* | Hugging Face access token (only needed if repository is private) |
+| `HF_REVISION` | *(Optional)* | Git revision or branch name on Hugging Face |
+| `HF_FORCE_DOWNLOAD` | `false` | Set to `true` to force re-download of checkpoints on startup |
+
+### 4. Build and Deploy Commands
+
+#### Build Container Image (using Google Cloud Build or Artifact Registry):
+```bash
+# Set Google Cloud project and image tag
+export PROJECT_ID="your-gcp-project-id"
+export IMAGE_TAG="gcr.io/${PROJECT_ID}/woundinsight-api:latest"
+
+# Submit build to Google Cloud Build
+gcloud builds submit --tag ${IMAGE_TAG} .
+```
+
+#### Deploy to Google Cloud Run:
+```bash
+gcloud run deploy woundinsight-api \
+  --image ${IMAGE_TAG} \
+  --platform managed \
+  --region us-central1 \
+  --allow-unauthenticated \
+  --memory 4Gi \
+  --cpu 2 \
+  --timeout 120s \
+  --port 8080 \
+  --set-env-vars API_DEVICE=cpu,HF_MODEL_REPO_ID=SnehanshKhanna/WoundInsight-models
+```
+
+### 5. Verification on Cloud Run
+
+Once deployed, query the service endpoints:
+- **Service Root**: `GET https://<cloud-run-url>/`
+- **Health Check**: `GET https://<cloud-run-url>/health`
+  ```json
+  {
+    "status": "healthy",
+    "device": "cpu",
+    "gpu_available": false,
+    "gpu_name": null,
+    "models_loaded": true,
+    "checkpoints": {
+      "wound_segmentation": "retrained_best_wound_model.pth",
+      "tissue_segmentation": "retrained_best_tissue_model.pth",
+      "etiology_classifier": "retrained_best_dual_branch_classifier.pth"
+    },
+    "database_connected": true
+  }
+  ```
+- **Interactive Documentation**: `GET https://<cloud-run-url>/docs`
+- **Submit Analysis**: `POST https://<cloud-run-url>/api/v1/analyses` (`multipart/form-data`, field `image`)
+
+---
+
+## Academic Notice & Clinical Disclaimer
+
+> **ACADEMIC PROTOTYPE NOTICE**:  
+> WoundInsight-API is an academic research prototype developed as part of an engineering final-year capstone project. It is not certified, cleared, or approved by the FDA, CE, or any healthcare regulatory body for standalone clinical diagnostic decisions. Output figures, tissue breakdown percentages, and triage severity classifications are intended solely for educational, research, and technical evaluation purposes. Clinician review is strictly required.
+
+---
+
+## Quickstart (Local Development)
 
 ### 1. Install Dependencies
 ```bash
@@ -111,10 +198,10 @@ pip install -r requirements.txt
 ```bash
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
-
 Interactive documentation is available at `http://localhost:8000/docs`.
 
 ### 3. Run Automated Tests
 ```bash
-pytest tests/ -v
+python tests/run_all_tests.py
 ```
+

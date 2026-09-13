@@ -1,0 +1,50 @@
+# Git repository metadata
+.git
+.gitignore
+
+# Python bytecode & cache directories
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.mypy_cache
+
+# Virtual environments
+venv
+.venv
+env
+.env
+.env.*
+
+# IDE configurations
+.idea
+.vscode
+
+# Ephemeral runtime storage assets & local databases
+storage/uploads/*
+!storage/uploads/.gitkeep
+storage/reports/*
+!storage/reports/.gitkeep
+storage/database/*
+!storage/database/.gitkeep
+*.db
+*.sqlite
+*.sqlite3
+
+# Model checkpoint weights (NEVER bake into image; fetched from Hugging Face at runtime)
+*.pth
+*.pt
+*.ckpt
+*.bin
+checkpoints/classification/*
+!checkpoints/classification/.gitkeep
+checkpoints/segmentation/*
+!checkpoints/segmentation/.gitkeep
+checkpoints/tissue_segmentation/*
+!checkpoints/tissue_segmentation/.gitkeep
+
+# Secrets & local development keys
+secrets
+*.pem
+*.key

@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from app.config import settings
 from app.db.database import init_db
 from app.services.inference_service import inference_service
+from app.services.model_manager import model_manager
 from app.routes.health import router as health_router
 from app.routes.analysis import router as analysis_router
 from app.routes.reports import router as reports_router
@@ -28,6 +29,13 @@ async def lifespan(app: FastAPI):
         init_db()
     except Exception as e:
         logger.error(f"Failed to initialize database: {e}", exc_info=True)
+        raise e
+
+    logger.info(f"Ensuring AI model checkpoints are available locally (HF Repo: {settings.HF_MODEL_REPO_ID})...")
+    try:
+        model_manager.ensure_models_available()
+    except Exception as e:
+        logger.error(f"FATAL: Failed to resolve/download AI models: {e}", exc_info=True)
         raise e
 
     logger.info("Initializing AI Inference Engine (3 production deep learning models)...")

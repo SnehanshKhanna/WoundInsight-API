@@ -12,6 +12,7 @@ from src.pipeline import MasterWoundSystem
 from app.config import settings
 from app.services.storage_service import storage_service
 from app.services.report_service import report_service
+from app.services.model_manager import model_manager
 from app.models.database_models import AnalysisRecordModel
 from app.db.repositories import AnalysisRepository
 from app.db.database import check_db_health
@@ -36,6 +37,9 @@ class InferenceService:
         """Loads all three production models onto designated device."""
         if self.system is not None:
             return
+
+        # Ensure model checkpoints are present locally (auto-downloads from HF Hub if missing)
+        model_manager.ensure_models_available()
 
         logger.info(f"Loading production models on device: {self.device}")
         for path_name, path_val in [
