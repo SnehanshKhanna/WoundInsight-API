@@ -64,6 +64,9 @@ checkpoints/**/*.pth
 storage/database/*.db
 storage/database/*.db-journal
 storage/database/*.sqlite3
+*.db
+*.sqlite3
+*.db-journal
 storage/reports/*
 !storage/reports/.gitkeep
 storage/uploads/*

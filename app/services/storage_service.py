@@ -45,4 +45,19 @@ class StorageService:
         """Returns targeted output path for a new diagnostic report figure."""
         return self.report_dir / f"report_{analysis_id}.png"
 
+    def save_gradcam_image(self, overlay_rgb, analysis_id: str) -> Path:
+        """Saves Grad-CAM attribution overlay figure to storage/reports/gradcam_{analysis_id}.png."""
+        from PIL import Image
+        dest_path = self.report_dir / f"gradcam_{analysis_id}.png"
+        img = Image.fromarray(overlay_rgb)
+        img.save(dest_path, format="PNG")
+        return dest_path
+
+    def get_gradcam_path(self, analysis_id: str) -> Optional[Path]:
+        """Returns path to the standalone Grad-CAM image PNG if it exists."""
+        gradcam_path = self.report_dir / f"gradcam_{analysis_id}.png"
+        if gradcam_path.exists() and gradcam_path.is_file():
+            return gradcam_path
+        return None
+
 storage_service = StorageService()

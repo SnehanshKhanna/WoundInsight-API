@@ -34,9 +34,29 @@ def get_db_connection() -> Generator[sqlite3.Connection, None, None]:
 def init_db() -> None:
     """Initializes schema and tables if they do not exist."""
     schema_sql = """
+    CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        email TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        name TEXT,
+        created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
+
+    CREATE TABLE IF NOT EXISTS wounds (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        location TEXT,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_wounds_user_id ON wounds (user_id);
+
     CREATE TABLE IF NOT EXISTS analyses (
         analysis_id TEXT PRIMARY KEY,
         user_id TEXT,
+        wound_id TEXT,
         original_filename TEXT NOT NULL,
         image_storage_path TEXT NOT NULL,
         report_storage_path TEXT NOT NULL,
@@ -59,7 +79,9 @@ def init_db() -> None:
         ai_confidence_score REAL NOT NULL,
         clinician_review_flag INTEGER NOT NULL,
         explainability_metadata TEXT,
-        inference_time_ms REAL NOT NULL
+        inference_time_ms REAL NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users (id),
+        FOREIGN KEY (wound_id) REFERENCES wounds (id)
     );
 
     CREATE INDEX IF NOT EXISTS idx_analyses_created_at ON analyses (created_at DESC);
@@ -67,6 +89,14 @@ def init_db() -> None:
     """
     with get_db_connection() as conn:
         conn.executescript(schema_sql)
+
+        # Migration guard: add wound_id column if upgrading an existing analyses table
+        cur = conn.execute("PRAGMA table_info(analyses);")
+        existing_cols = {row["name"] for row in cur.fetchall()}
+        if "wound_id" not in existing_cols:
+            conn.execute("ALTER TABLE analyses ADD COLUMN wound_id TEXT;")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_analyses_wound_id ON analyses (wound_id);")
+
     logger.info(f"Database initialized at: {get_db_path()}")
 
 def check_db_health() -> bool:

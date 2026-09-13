@@ -91,7 +91,8 @@ class InferenceService:
         pil_image: Image.Image,
         file_bytes: bytes,
         original_filename: str,
-        user_id: Optional[str] = None
+        user_id: Optional[str] = None,
+        wound_id: Optional[str] = None
     ) -> Dict[str, Any]:
         if not self.is_ready():
             raise RuntimeError("Inference engine is not initialized.")
@@ -118,6 +119,14 @@ class InferenceService:
             analysis_id=analysis_id
         )
 
+        # 3.1 Persist standalone Grad-CAM attribution image if available
+        expl_raw = raw_results["_raw"].get("explainability_data")
+        if expl_raw and "fused_overlay" in expl_raw:
+            try:
+                storage_service.save_gradcam_image(expl_raw["fused_overlay"], analysis_id)
+            except Exception as e:
+                logger.warning(f"Failed to persist standalone Grad-CAM image: {e}")
+
         # 4. Format structured probability map
         diag_probs = raw_results["diagnostics"]["class_probabilities"]
         formatted_probs = {
@@ -137,6 +146,7 @@ class InferenceService:
         db_record = AnalysisRecordModel(
             analysis_id=analysis_id,
             user_id=user_id,
+            wound_id=wound_id,
             original_filename=original_filename,
             image_storage_path=str(img_dest),
             report_storage_path=str(report_dest),
@@ -171,6 +181,7 @@ class InferenceService:
             "timestamp": created_at_iso,
             "original_filename": original_filename,
             "user_id": user_id,
+            "wound_id": wound_id,
             "wound": {
                 "detected": bool(morph["area_pixels"] > 0),
                 "area_pixels": int(morph["area_pixels"]),
@@ -202,6 +213,7 @@ class InferenceService:
                 "report_image_url": f"/api/v1/analyses/{analysis_id}/report",
                 "report_filename": report_filename,
                 "original_image_url": f"/api/v1/analyses/{analysis_id}/image",
+                "gradcam_image_url": f"/api/v1/analyses/{analysis_id}/gradcam"
             },
             "explainability": expl,
             "academic_notice": "Academic prototype. Not certified for standalone clinical diagnostic decisions.",

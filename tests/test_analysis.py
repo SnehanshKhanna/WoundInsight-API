@@ -17,11 +17,20 @@ def test_inference_pipeline_on_real_image():
         with open(sample_path, "rb") as f:
             img_bytes = f.read()
 
+        # Authenticate test clinician
+        reg = client.post("/api/v1/auth/register", json={"email": "clinician@test.org", "password": "password123", "name": "Clinician"})
+        token = reg.json().get("access_token") or client.post("/api/v1/auth/login", json={"email": "clinician@test.org", "password": "password123"}).json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+        
+        w_res = client.post("/api/v1/wounds", json={"name": "Test DFU", "location": "Left foot"}, headers=headers)
+        wound_id = w_res.json()["id"]
+
         t0 = time.perf_counter()
         response = client.post(
             "/api/v1/analyses",
             files={"image": ("sample_dfu.png", img_bytes, "image/png")},
-            data={"user_id": "clinician_test_01"}
+            data={"wound_id": wound_id},
+            headers=headers
         )
         elapsed_ms = (time.perf_counter() - t0) * 1000.0
 
@@ -31,7 +40,7 @@ def test_inference_pipeline_on_real_image():
         # Invariants
         assert data["status"] == "success"
         assert len(data["analysis_id"]) > 10
-        assert data["user_id"] == "clinician_test_01"
+        assert len(data["user_id"]) > 5
         assert data["original_filename"] == "sample_dfu.png"
 
         # 1. Wound Morphometrics
@@ -110,10 +119,19 @@ def test_legacy_analyze_endpoint():
 
 def test_error_handling_invalid_inputs():
     with TestClient(app) as client:
+        reg = client.post("/api/v1/auth/register", json={"email": "invalid_inputs@test.org", "password": "password123", "name": "Invalid Inputs Test"})
+        token = reg.json().get("access_token") or client.post("/api/v1/auth/login", json={"email": "invalid_inputs@test.org", "password": "password123"}).json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+        
+        w_res = client.post("/api/v1/wounds", json={"name": "Invalid Inputs Wound"}, headers=headers)
+        wound_id = w_res.json()["id"]
+
         # 1. Non-image text file
         r_txt = client.post(
             "/api/v1/analyses",
-            files={"image": ("note.txt", b"This is a text note, not an image.", "text/plain")}
+            files={"image": ("note.txt", b"This is a text note, not an image.", "text/plain")},
+            data={"wound_id": wound_id},
+            headers=headers
         )
         assert r_txt.status_code == 400
         assert "Unsupported" in r_txt.json()["detail"]
@@ -121,7 +139,9 @@ def test_error_handling_invalid_inputs():
         # 2. Corrupted file
         r_corrupt = client.post(
             "/api/v1/analyses",
-            files={"image": ("corrupted.png", b"CORRUPTED_NOT_A_PNG_HEADER_DATA", "image/png")}
+            files={"image": ("corrupted.png", b"CORRUPTED_NOT_A_PNG_HEADER_DATA", "image/png")},
+            data={"wound_id": wound_id},
+            headers=headers
         )
         assert r_corrupt.status_code == 400
         assert "not a valid" in r_corrupt.json()["detail"]
@@ -129,7 +149,9 @@ def test_error_handling_invalid_inputs():
         # 3. Empty 0-byte file
         r_empty = client.post(
             "/api/v1/analyses",
-            files={"image": ("empty.jpg", b"", "image/jpeg")}
+            files={"image": ("empty.jpg", b"", "image/jpeg")},
+            data={"wound_id": wound_id},
+            headers=headers
         )
         assert r_empty.status_code == 400
         assert "empty" in r_empty.json()["detail"]

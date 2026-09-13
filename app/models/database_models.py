@@ -27,4 +27,21 @@ class AnalysisRecordModel:
     clinician_review_flag: bool
     inference_time_ms: float
     user_id: Optional[str] = None
+    wound_id: Optional[str] = None
     explainability_metadata: Optional[Dict[str, Any]] = None
+
+@dataclass
+class UserModel:
+    id: str
+    email: str
+    password_hash: str
+    created_at: str
+    name: Optional[str] = None
+
+@dataclass
+class WoundModel:
+    id: str
+    user_id: str
+    name: str
+    created_at: str
+    location: Optional[str] = None

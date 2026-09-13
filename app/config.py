@@ -83,6 +83,11 @@ class Settings:
     # CORS Configuration
     CORS_ORIGINS: list[str] = ["*"]
 
+    # JWT Authentication Configuration
+    JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "woundinsight_super_secret_production_key_2026_clinical_ai")
+    JWT_ALGORITHM: str = "HS256"
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "10080"))  # 7 days default
+
     def ensure_storage_dirs(self) -> None:
         """Ensures all persistence and checkpoint directories exist on disk."""
         self.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)

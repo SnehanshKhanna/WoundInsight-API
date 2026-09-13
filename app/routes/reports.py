@@ -1,7 +1,9 @@
 import logging
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 from fastapi.responses import FileResponse
 from app.services.report_service import report_service
+from app.db.repositories import AnalysisRepository
+from app.utils.auth import get_current_user
 
 logger = logging.getLogger("wound_api.routes.reports")
 router = APIRouter(tags=["Reports"])
@@ -11,11 +13,21 @@ router = APIRouter(tags=["Reports"])
     summary="Retrieve Diagnostic Report Image",
     responses={
         200: {"content": {"image/png": {}}, "description": "Diagnostic Report Figure PNG"},
-        404: {"description": "Report image not found"}
+        404: {"description": "Report image not found or unauthorized"}
     }
 )
-async def get_analysis_report(analysis_id: str):
-    """Retrieves the generated 6-panel diagnostic visual report PNG for the specified analysis_id."""
+async def get_analysis_report(
+    analysis_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Retrieves the generated 6-panel diagnostic visual report PNG, verifying ownership."""
+    record = AnalysisRepository.get_by_id(analysis_id)
+    if not record or record["user_id"] != current_user["id"]:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Diagnostic report for analysis '{analysis_id}' was not found."
+        )
+
     report_file = report_service.get_report_file(analysis_id)
     if not report_file or not report_file.exists():
         raise HTTPException(

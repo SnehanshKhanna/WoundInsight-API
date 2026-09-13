@@ -38,6 +38,7 @@ class VisualOutputs(BaseModel):
     report_image_url: str = Field(..., description="URL endpoint to access the diagnostic visual report")
     report_filename: str = Field(..., description="Saved report image filename")
     original_image_url: Optional[str] = Field(None, description="URL endpoint to access the original stored image")
+    gradcam_image_url: Optional[str] = Field(None, description="URL endpoint to access the standalone fused Grad-CAM attribution image")
 
 class ExplainabilityAttribution(BaseModel):
     available: bool = Field(..., description="Whether Grad-CAM attribution is generated")
@@ -57,6 +58,7 @@ class AnalysisResponse(BaseModel):
     timestamp: str = Field(..., description="ISO 8601 analysis timestamp")
     original_filename: str = Field(..., description="Original uploaded filename")
     user_id: Optional[str] = Field(None, description="User or session identifier (if provided)")
+    wound_id: Optional[str] = Field(None, description="Associated wound identifier")
     wound: WoundMorphometrics
     tissue: TissueBreakdown
     etiology: EtiologyDiagnostics
@@ -75,6 +77,7 @@ class AnalysisSummaryItem(BaseModel):
     created_at: str
     original_filename: str
     user_id: Optional[str] = None
+    wound_id: Optional[str] = None
     predicted_etiology: str
     etiology_confidence: float
     wound_area_cm2: float
