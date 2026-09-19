@@ -14,7 +14,6 @@ from huggingface_hub import HfApi
 from app.config import settings
 from app.services.model_manager import model_manager
 from app.services.inference_service import inference_service
-from app.db.database import init_db
 
 # Expected cryptographic SHA256 hashes of production checkpoints
 EXPECTED_SHA256 = {
@@ -92,8 +91,6 @@ def test_numerical_equivalence_on_1014():
     """
     import torch
     torch.manual_seed(42)
-
-    init_db()
     inference_service.initialize_models()
 
     sample_path = API_ROOT / "tests" / "sample_images" / "1014.png"
@@ -108,7 +105,8 @@ def test_numerical_equivalence_on_1014():
         pil_image=img,
         file_bytes=img_bytes,
         original_filename="1014.png",
-        user_id="test_hf_verification"
+        user_id="test_hf_verification",
+        wound_id="test_wound_id"
     )
 
     # 1. Structure Invariants

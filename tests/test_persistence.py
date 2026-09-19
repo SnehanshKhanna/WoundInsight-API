@@ -61,15 +61,14 @@ def test_persistence_and_retrieval():
         assert all(a["wound_id"] == wound_id for a in wound_list_data["analyses"])
 
         # 5. Retrieve diagnostic report image
-        r_report = client.get(f"/api/v1/analyses/{analysis_id}/report", headers=headers)
-        assert r_report.status_code == 200
-        assert r_report.headers["content-type"] == "image/png"
-        assert len(r_report.content) > 1000  # valid PNG binary
+        r_report = client.get(f"/api/v1/analyses/{analysis_id}/report", headers=headers, follow_redirects=False)
+        assert r_report.status_code == 307
+        assert "location" in r_report.headers
 
         # 6. Retrieve stored original image
-        r_orig = client.get(f"/api/v1/analyses/{analysis_id}/image", headers=headers)
-        assert r_orig.status_code == 200
-        assert len(r_orig.content) == len(img_bytes)
+        r_orig = client.get(f"/api/v1/analyses/{analysis_id}/image", headers=headers, follow_redirects=False)
+        assert r_orig.status_code == 307
+        assert "location" in r_orig.headers
 
         # 7. Non-existent record returns 404
         r_404 = client.get("/api/v1/analyses/nonexistent-uuid-12345", headers=headers)

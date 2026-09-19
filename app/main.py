@@ -25,8 +25,8 @@ logger = logging.getLogger("wound_api")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Lifespan context manager: sets up SQLite database and loads deep learning models once."""
-    logger.info("Initializing WoundInsight-API persistence layer (SQLite)...")
+    """Lifespan context manager: sets up PostgreSQL database and loads deep learning models once."""
+    logger.info("Initializing WoundInsight-API persistence layer (PostgreSQL)...")
     try:
         init_db()
     except Exception as e:
@@ -76,8 +76,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount static report and upload directories for direct asset streaming if needed
-app.mount("/static/reports", StaticFiles(directory=str(settings.REPORT_DIR)), name="reports_static")
+# Static files are no longer mounted locally; all artifacts are served via Supabase Signed URLs
 
 # Register API Routers
 app.include_router(health_router)

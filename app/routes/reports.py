@@ -1,7 +1,7 @@
 import logging
 from fastapi import APIRouter, HTTPException, status, Depends
-from fastapi.responses import FileResponse
-from app.services.report_service import report_service
+from fastapi.responses import RedirectResponse
+from app.services.storage_service import storage_service
 from app.db.repositories import AnalysisRepository
 from app.utils.auth import get_current_user
 
@@ -28,10 +28,14 @@ async def get_analysis_report(
             detail=f"Diagnostic report for analysis '{analysis_id}' was not found."
         )
 
-    report_file = report_service.get_report_file(analysis_id)
-    if not report_file or not report_file.exists():
+    report_path = f"users/{current_user['id']}/wounds/{record['wound_id']}/analyses/{analysis_id}/report.png"
+    
+    try:
+        signed_url = storage_service.get_signed_url(report_path)
+        return RedirectResponse(url=signed_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+    except Exception as e:
+        logger.error(f"Failed to generate signed URL for report {analysis_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Diagnostic report for analysis '{analysis_id}' was not found."
         )
-    return FileResponse(path=str(report_file), media_type="image/png", filename=f"report_{analysis_id}.png")

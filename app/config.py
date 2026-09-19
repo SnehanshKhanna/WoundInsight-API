@@ -4,9 +4,11 @@ from pathlib import Path
 import torch
 
 from typing import Optional
+from dotenv import load_dotenv
 
 # Base Directory of WoundInsight-API project
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")
 
 # Ensure project root is on sys.path so that 'src.pipeline' imports succeed cleanly
 if str(BASE_DIR) not in sys.path:
@@ -56,17 +58,19 @@ class Settings:
     # Fallback Spatial Scale (assumed 0.15 mm/pixel for clinical photography heuristic)
     FALLBACK_SCALE: float = float(os.getenv("FALLBACK_SCALE", "0.15"))
 
-    # Storage Directories
-    STORAGE_DIR: Path = BASE_DIR / "storage"
-    UPLOAD_DIR: Path = STORAGE_DIR / "uploads"
-    REPORT_DIR: Path = STORAGE_DIR / "reports"
-    DATABASE_DIR: Path = STORAGE_DIR / "database"
+    # Database Configuration
+    DATABASE_URL: str = os.environ.get("DATABASE_URL")
+    if not DATABASE_URL:
+        raise ValueError("DATABASE_URL environment variable must be set for PostgreSQL connection.")
 
-    # Database Configuration (SQLite default with support for external PostgreSQL/MySQL via env)
-    DATABASE_URL: str = os.getenv(
-        "DATABASE_URL",
-        f"sqlite:///{DATABASE_DIR / 'woundinsight.db'}"
-    )
+    # Supabase Configuration
+    SUPABASE_URL: str = os.environ.get("SUPABASE_URL")
+    if not SUPABASE_URL:
+        raise ValueError("SUPABASE_URL environment variable must be set.")
+
+    SUPABASE_SERVICE_ROLE_KEY: str = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    if not SUPABASE_SERVICE_ROLE_KEY:
+        raise ValueError("SUPABASE_SERVICE_ROLE_KEY environment variable must be set.")
 
     # Allowed Upload Extensions & MIME Types
     ALLOWED_EXTENSIONS: set = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
@@ -91,10 +95,7 @@ class Settings:
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "10080"))  # 7 days default
 
     def ensure_storage_dirs(self) -> None:
-        """Ensures all persistence and checkpoint directories exist on disk."""
-        self.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-        self.REPORT_DIR.mkdir(parents=True, exist_ok=True)
-        self.DATABASE_DIR.mkdir(parents=True, exist_ok=True)
+        """Ensures checkpoint directories exist on disk."""
         self.CHECKPOINTS_DIR.mkdir(parents=True, exist_ok=True)
         (self.CHECKPOINTS_DIR / "classification").mkdir(parents=True, exist_ok=True)
         (self.CHECKPOINTS_DIR / "segmentation").mkdir(parents=True, exist_ok=True)

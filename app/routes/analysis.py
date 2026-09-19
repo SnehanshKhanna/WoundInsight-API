@@ -1,7 +1,7 @@
 import logging
 from typing import Optional
 from fastapi import APIRouter, UploadFile, File, Form, Query, HTTPException, status, Depends
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import RedirectResponse, JSONResponse
 
 from app.schemas.analysis import AnalysisResponse, AnalysisListResponse
 from app.schemas.error import ErrorResponse
@@ -189,16 +189,15 @@ async def get_analysis_original_image(
             detail=f"Analysis record '{analysis_id}' was not found."
         )
 
-    img_path = storage_service.get_uploaded_image_path(analysis_id)
-    if not img_path or not img_path.exists():
+    img_path = record["image_storage_path"]
+    if not img_path:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Original image for analysis '{analysis_id}' was not found."
         )
 
-    ext = img_path.suffix.lower()
-    media_type = "image/png" if ext == ".png" else ("image/webp" if ext == ".webp" else "image/jpeg")
-    return FileResponse(path=str(img_path), media_type=media_type, filename=img_path.name)
+    signed_url = storage_service.get_signed_url(img_path)
+    return RedirectResponse(url=signed_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
 
 @router.get(
     "/api/v1/analyses/{analysis_id}/gradcam",
@@ -220,11 +219,14 @@ async def get_analysis_gradcam_image(
             detail=f"Analysis record '{analysis_id}' was not found."
         )
 
-    gradcam_path = storage_service.get_gradcam_path(analysis_id)
-    if not gradcam_path or not gradcam_path.exists():
+    gradcam_path = f"users/{current_user['id']}/wounds/{record['wound_id']}/analyses/{analysis_id}/gradcam.png"
+    
+    try:
+        signed_url = storage_service.get_signed_url(gradcam_path)
+        return RedirectResponse(url=signed_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+    except Exception as e:
+        logger.error(f"Failed to generate signed URL for Grad-CAM {analysis_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Grad-CAM visualization for analysis '{analysis_id}' was not found."
         )
-
-    return FileResponse(path=str(gradcam_path), media_type="image/png", filename=f"gradcam_{analysis_id}.png")

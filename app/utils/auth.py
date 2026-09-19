@@ -7,7 +7,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.config import settings
-from app.db.database import get_db_connection
+from app.db.repositories import UserRepository
 
 logger = logging.getLogger("wound_api.auth")
 security = HTTPBearer(auto_error=True)
@@ -69,7 +69,7 @@ async def get_current_user(
 ) -> Dict[str, Any]:
     """
     FastAPI dependency validating the Authorization Bearer JWT.
-    Returns the authenticated user record from the SQLite database.
+    Returns the authenticated user record from the PostgreSQL database.
     """
     token = credentials.credentials
     payload = decode_access_token(token)
@@ -81,15 +81,17 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"}
         )
 
-    # Fetch user from database
-    sql = "SELECT id, email, name, created_at FROM users WHERE id = ?;"
-    with get_db_connection() as conn:
-        cur = conn.execute(sql, (user_id,))
-        row = cur.fetchone()
-        if not row:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User account no longer exists.",
-                headers={"WWW-Authenticate": "Bearer"}
-            )
-        return dict(row)
+    # Fetch user from database using Repository abstraction
+    user = UserRepository.get_by_id(user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User account no longer exists.",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+    return {
+        "id": user.id,
+        "email": user.email,
+        "name": user.name,
+        "created_at": user.created_at
+    }

@@ -1,8 +1,11 @@
-import os
 import re
+import logging
 from pathlib import Path
 from typing import Optional
+from supabase import create_client, Client
 from app.config import settings
+
+logger = logging.getLogger("wound_api.storage")
 
 def sanitize_filename(filename: str) -> str:
     """Removes potentially dangerous path traversal characters."""
@@ -10,54 +13,56 @@ def sanitize_filename(filename: str) -> str:
     return clean or "upload.jpg"
 
 class StorageService:
-    """Service managing persistent disk storage of uploaded wound photos and generated diagnostic reports."""
-
+    """Service managing persistent cloud storage in Supabase."""
+    
     def __init__(self):
-        self.upload_dir = settings.UPLOAD_DIR
-        self.report_dir = settings.REPORT_DIR
-        self.upload_dir.mkdir(parents=True, exist_ok=True)
-        self.report_dir.mkdir(parents=True, exist_ok=True)
-
-    def save_uploaded_image(self, file_bytes: bytes, filename: str, analysis_id: str) -> Path:
-        """Saves original uploaded image payload to storage/uploads/{analysis_id}_{filename}."""
+        self.bucket_name = "clinical-artifacts"
+        self.supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
+        
+    def upload_original_image(self, user_id: str, wound_id: str, analysis_id: str, filename: str, file_bytes: bytes) -> str:
         safe_name = sanitize_filename(filename)
-        stored_name = f"{analysis_id}_{safe_name}"
-        dest_path = self.upload_dir / stored_name
-        with open(dest_path, "wb") as f:
-            f.write(file_bytes)
-        return dest_path
+        path = f"users/{user_id}/wounds/{wound_id}/analyses/{analysis_id}/original_{safe_name}"
+        self.supabase.storage.from_(self.bucket_name).upload(path, file_bytes)
+        logger.info(f"Uploaded original image to {path}")
+        return path
 
-    def get_uploaded_image_path(self, analysis_id: str) -> Optional[Path]:
-        """Finds stored uploaded image by analysis_id prefix."""
-        for item in self.upload_dir.iterdir():
-            if item.is_file() and item.name.startswith(f"{analysis_id}_"):
-                return item
-        return None
+    def upload_gradcam_image(self, user_id: str, wound_id: str, analysis_id: str, image_bytes: bytes) -> str:
+        path = f"users/{user_id}/wounds/{wound_id}/analyses/{analysis_id}/gradcam.png"
+        self.supabase.storage.from_(self.bucket_name).upload(
+            path, 
+            image_bytes,
+            file_options={"content-type": "image/png"}
+        )
+        logger.info(f"Uploaded Grad-CAM image to {path}")
+        return path
 
-    def get_report_path(self, analysis_id: str) -> Optional[Path]:
-        """Returns path to the generated diagnostic report PNG."""
-        report_path = self.report_dir / f"report_{analysis_id}.png"
-        if report_path.exists() and report_path.is_file():
-            return report_path
-        return None
+    def upload_report_image(self, user_id: str, wound_id: str, analysis_id: str, image_bytes: bytes) -> str:
+        path = f"users/{user_id}/wounds/{wound_id}/analyses/{analysis_id}/report.png"
+        self.supabase.storage.from_(self.bucket_name).upload(
+            path, 
+            image_bytes,
+            file_options={"content-type": "image/png"}
+        )
+        logger.info(f"Uploaded report image to {path}")
+        return path
 
-    def get_report_destination(self, analysis_id: str) -> Path:
-        """Returns targeted output path for a new diagnostic report figure."""
-        return self.report_dir / f"report_{analysis_id}.png"
+    def get_signed_url(self, storage_path: str, expires_in: int = 60) -> str:
+        res = self.supabase.storage.from_(self.bucket_name).create_signed_url(storage_path, expires_in)
+        return res["signedURL"]
 
-    def save_gradcam_image(self, overlay_rgb, analysis_id: str) -> Path:
-        """Saves Grad-CAM attribution overlay figure to storage/reports/gradcam_{analysis_id}.png."""
-        from PIL import Image
-        dest_path = self.report_dir / f"gradcam_{analysis_id}.png"
-        img = Image.fromarray(overlay_rgb)
-        img.save(dest_path, format="PNG")
-        return dest_path
-
-    def get_gradcam_path(self, analysis_id: str) -> Optional[Path]:
-        """Returns path to the standalone Grad-CAM image PNG if it exists."""
-        gradcam_path = self.report_dir / f"gradcam_{analysis_id}.png"
-        if gradcam_path.exists() and gradcam_path.is_file():
-            return gradcam_path
-        return None
+    def delete_analysis_artifacts(self, user_id: str, wound_id: str, analysis_id: str) -> None:
+        """Best-effort cleanup of any files uploaded for this analysis."""
+        prefix = f"users/{user_id}/wounds/{wound_id}/analyses/{analysis_id}/"
+        try:
+            # list takes the folder path
+            files = self.supabase.storage.from_(self.bucket_name).list(prefix)
+            if not files:
+                return
+            paths_to_delete = [f"{prefix}{f['name']}" for f in files if f.get('name')]
+            if paths_to_delete:
+                self.supabase.storage.from_(self.bucket_name).remove(paths_to_delete)
+                logger.info(f"Cleaned up {len(paths_to_delete)} artifacts for analysis {analysis_id}")
+        except Exception as e:
+            logger.error(f"Failed to cleanup artifacts for analysis {analysis_id}: {e}")
 
 storage_service = StorageService()

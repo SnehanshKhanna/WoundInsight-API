@@ -39,9 +39,6 @@ COPY src/ src/
 
 # Step 4: Create required ephemeral runtime storage and model directories
 RUN mkdir -p \
-    storage/database \
-    storage/uploads \
-    storage/reports \
     checkpoints/classification \
     checkpoints/segmentation \
     checkpoints/tissue_segmentation

@@ -5,11 +5,8 @@ from PIL import Image
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.db.database import init_db
 
-@pytest.fixture(scope="module", autouse=True)
-def setup_db():
-    init_db()
+# Database setup is handled globally by conftest.py
 
 @pytest.fixture(scope="module")
 def client():
@@ -129,20 +126,19 @@ def test_auth_and_ownership_flow(client):
     get_denied = client.get(f"/api/v1/analyses/{analysis_id}", headers=headers_b)
     assert get_denied.status_code == 404
 
-    # 10. Isolation on report and image
-    img_ok = client.get(f"/api/v1/analyses/{analysis_id}/image", headers=headers_a)
-    assert img_ok.status_code == 200
+    # 10. Isolation    # Artifact retrieval permissions
+    img_ok = client.get(f"/api/v1/analyses/{analysis_id}/image", headers=headers_a, follow_redirects=False)
+    assert img_ok.status_code == 307
 
-    img_denied = client.get(f"/api/v1/analyses/{analysis_id}/image", headers=headers_b)
+    img_denied = client.get(f"/api/v1/analyses/{analysis_id}/image", headers=headers_b, follow_redirects=False)
     assert img_denied.status_code == 404
 
-    rep_ok = client.get(f"/api/v1/analyses/{analysis_id}/report", headers=headers_a)
-    assert rep_ok.status_code == 200
+    rep_ok = client.get(f"/api/v1/analyses/{analysis_id}/report", headers=headers_a, follow_redirects=False)
+    assert rep_ok.status_code == 307
 
-    rep_denied = client.get(f"/api/v1/analyses/{analysis_id}/report", headers=headers_b)
+    rep_denied = client.get(f"/api/v1/analyses/{analysis_id}/report", headers=headers_b, follow_redirects=False)
     assert rep_denied.status_code == 404
 
-    # 11. Standalone Grad-CAM endpoint
-    cam_ok = client.get(f"/api/v1/analyses/{analysis_id}/gradcam", headers=headers_a)
-    assert cam_ok.status_code == 200
-    assert cam_ok.headers["content-type"] == "image/png"
+    cam_ok = client.get(f"/api/v1/analyses/{analysis_id}/gradcam", headers=headers_a, follow_redirects=False)
+    assert cam_ok.status_code == 307
+    assert "location" in cam_ok.headers
